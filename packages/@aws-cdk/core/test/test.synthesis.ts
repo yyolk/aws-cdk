@@ -24,7 +24,7 @@ export = {
 
     // THEN
     test.same(app.synth(), session); // same session if we synth() again
-    test.deepEqual(list(session.directory), [ 'cdk.out', 'manifest.json' ]);
+    test.deepEqual(list(session.directory), [ 'annotations.json', 'cdk.out', 'manifest.json' ]);
     test.deepEqual(readJson(session.directory, 'manifest.json').artifacts, {});
     test.done();
   },
@@ -38,11 +38,7 @@ export = {
     const session = app.synth();
 
     // THEN
-    test.deepEqual(list(session.directory), [
-      'cdk.out',
-      'manifest.json',
-      'one-stack.template.json'
-    ]);
+    test.ok(list(session.directory).includes('one-stack.template.json'));
     test.done();
   },
 
@@ -70,12 +66,9 @@ export = {
     const session = app.synth();
 
     // THEN
-    test.deepEqual(list(session.directory), [
-      'cdk.out',
-      'foo.json',
-      'manifest.json',
-      'one-stack.template.json'
-    ]);
+    test.ok(list(session.directory).includes('one-stack.template.json'));
+    test.ok(list(session.directory).includes('foo.json'));
+
     test.deepEqual(readJson(session.directory, 'foo.json'), { bar: 123 });
     test.deepEqual(session.manifest, {
       version: '0.36.0',

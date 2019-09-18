@@ -1,6 +1,7 @@
 import cxapi = require('@aws-cdk/cx-api');
 import { CloudAssembly } from '@aws-cdk/cx-api';
 import { Construct, ConstructNode } from './construct';
+import { AppAnnotations } from './private/app-annotations';
 import { collectRuntimeInformation } from './private/runtime-info';
 
 const APP_SYMBOL = Symbol.for('@aws-cdk/core.App');
@@ -110,6 +111,8 @@ export class App extends Construct {
       // doesn't bite manual calling of the function.
       process.once('beforeExit', () => this.synth());
     }
+
+    new AppAnnotations(this);
   }
 
   /**

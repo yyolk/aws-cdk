@@ -3,14 +3,13 @@ import { Test } from 'nodeunit';
 import { App as Root, Aws, Construct, ConstructNode, ConstructOrder, IConstruct, Lazy, ValidationError } from '../lib';
 
 // tslint:disable:variable-name
-// tslint:disable:max-line-length
 
 export = {
   'the "Root" construct is a special construct which can be used as the root of the tree'(test: Test) {
     const root = new Root();
     test.equal(root.node.id, '', 'if not specified, name of a root construct is an empty string');
     test.ok(!root.node.scope, 'no parent');
-    test.equal(root.node.children.length, 0, 'a construct is created without children'); // no children
+    test.equal(root.node.children.length, 1); // AppAnnotation construct is the only child
     test.done();
   },
 
@@ -100,7 +99,7 @@ export = {
     const child = new Construct(root, 'Child1');
     new Construct(root, 'Child2');
     test.equal(child.node.children.length, 0, 'no children');
-    test.equal(root.node.children.length, 2, 'two children are expected');
+    test.ok(root.node.children.length >= 2, 'three children are expected'); // 2 Constructs + any support constructs (eg. AppAnnotations)
     test.done();
   },
 
@@ -128,7 +127,7 @@ export = {
     test.equal(t.root.toString(), '<root>');
     test.equal(t.child1_1_1.toString(), 'Child1/Child11/Child111');
     test.equal(t.child2.toString(), 'Child2');
-    test.equal(toTreeString(t.root), 'App\n  Construct [Child1]\n    Construct [Child11]\n      Construct [Child111]\n    Construct [Child12]\n  Construct [Child2]\n    Construct [Child21]\n');
+    test.equal(toTreeString(t.root), 'App\n  AppAnnotations [AppAnnotations]\n  Construct [Child1]\n    Construct [Child11]\n      Construct [Child111]\n    Construct [Child12]\n  Construct [Child2]\n    Construct [Child21]\n');
     test.done();
   },
 
@@ -144,6 +143,7 @@ export = {
     test.done();
   },
 
+  // tslint:disable-next-line:max-line-length
   'construct.setContext(k,v) sets context at some level and construct.getContext(key) will return the lowermost value defined in the stack'(test: Test) {
     const root = new Root();
     root.node.setContext('c1', 'root');
@@ -302,7 +302,7 @@ export = {
     new MyBeautifulConstruct(root, 'mbc2');
     new MyBeautifulConstruct(root, 'mbc3');
     new MyBeautifulConstruct(root, 'mbc4');
-    test.equal(root.node.children.length, 4);
+    test.ok(root.node.children.length >= 4);
     test.done();
   },
 
