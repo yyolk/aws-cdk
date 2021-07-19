@@ -1,11 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { expect, haveResource, matchTemplate, SynthUtils } from '@aws-cdk/assert';
+import { expect, haveResource, matchTemplate, SynthUtils } from '@aws-cdk/assert-internal';
 import * as s3_assets from '@aws-cdk/aws-s3-assets';
 import * as sns from '@aws-cdk/aws-sns';
-import { App, CfnParameter, CfnResource, Construct, ContextProvider, LegacyStackSynthesizer, Names, Stack } from '@aws-cdk/core';
+import { App, CfnParameter, CfnResource, ContextProvider, LegacyStackSynthesizer, Names, Stack } from '@aws-cdk/core';
 import { Test } from 'nodeunit';
 import { NestedStack } from '../lib/nested-stack';
+
+// keep this import separate from other imports to reduce chance for merge conflicts with v2-main
+// eslint-disable-next-line no-duplicate-imports, import/order
+import { Construct } from '@aws-cdk/core';
 
 /* eslint-disable cdk/no-core-construct */
 /* eslint-disable max-len */
@@ -126,6 +130,8 @@ export = {
       Resources: {
         nestedstackNestedStacknestedstackNestedStackResource71CDD241: {
           Type: 'AWS::CloudFormation::Stack',
+          DeletionPolicy: 'Delete',
+          UpdateReplacePolicy: 'Delete',
           Properties: {
             TemplateURL: {
               'Fn::Join': [
@@ -714,7 +720,10 @@ export = {
       },
     });
 
-    const middleStackHash = 'b2670b4c0c3fdf1d8fd9b9272bb8bf8173d18c0f67a888ba165cc569a248a84f';
+    const middleStackHash = '7c426f7299a739900279ac1ece040397c1913cdf786f5228677b289f4d5e4c48';
+    const bucketSuffix = 'C706B101';
+    const versionSuffix = '4B193AA5';
+    const hashSuffix = 'E28F0693';
 
     // nested1 wires the nested2 template through parameters, so we expect those
     expect(nested1).to(haveResource('Resource::1'));
@@ -731,9 +740,9 @@ export = {
       AssetParameters8169c6f8aaeaf5e2e8620f5f895ffe2099202ccb4b6889df48fe0967a894235cS3BucketDE3B88D6: { Type: 'String', Description: 'S3 bucket for asset "8169c6f8aaeaf5e2e8620f5f895ffe2099202ccb4b6889df48fe0967a894235c"' },
       AssetParameters8169c6f8aaeaf5e2e8620f5f895ffe2099202ccb4b6889df48fe0967a894235cS3VersionKey3A62EFEA: { Type: 'String', Description: 'S3 key for asset version "8169c6f8aaeaf5e2e8620f5f895ffe2099202ccb4b6889df48fe0967a894235c"' },
       AssetParameters8169c6f8aaeaf5e2e8620f5f895ffe2099202ccb4b6889df48fe0967a894235cArtifactHash7DC546E0: { Type: 'String', Description: 'Artifact hash for asset "8169c6f8aaeaf5e2e8620f5f895ffe2099202ccb4b6889df48fe0967a894235c"' },
-      [`AssetParameters${middleStackHash}S3Bucket3DB431CB`]: { Type: 'String', Description: `S3 bucket for asset "${middleStackHash}"` },
-      [`AssetParameters${middleStackHash}S3VersionKeyBFFDABE9`]: { Type: 'String', Description: `S3 key for asset version "${middleStackHash}"` },
-      [`AssetParameters${middleStackHash}ArtifactHash8EA52875`]: { Type: 'String', Description: `Artifact hash for asset "${middleStackHash}"` },
+      [`AssetParameters${middleStackHash}S3Bucket${bucketSuffix}`]: { Type: 'String', Description: `S3 bucket for asset "${middleStackHash}"` },
+      [`AssetParameters${middleStackHash}S3VersionKey${versionSuffix}`]: { Type: 'String', Description: `S3 key for asset version "${middleStackHash}"` },
+      [`AssetParameters${middleStackHash}ArtifactHash${hashSuffix}`]: { Type: 'String', Description: `Artifact hash for asset "${middleStackHash}"` },
     });
 
     // proxy asset params to nested stack
@@ -746,6 +755,35 @@ export = {
 
     // parent stack should have 2 assets
     test.deepEqual(assembly.getStackByName(parent.stackName).assets.length, 2);
+    test.done();
+  },
+
+  'reference resource in a double nested stack (#15155)'(test: Test) {
+    // GIVEN
+    const app = new App();
+    const producerStack = new Stack(app, 'Producer');
+    const nested2 = new NestedStack(new NestedStack(producerStack, 'Nested1'), 'Nested2');
+    const producerResource = new CfnResource(nested2, 'Resource', { type: 'MyResource' });
+    const consumerStack = new Stack(app, 'Consumer');
+
+    // WHEN
+    new CfnResource(consumerStack, 'ConsumingResource', {
+      type: 'YourResource',
+      properties: { RefToResource: producerResource.ref },
+    });
+
+    // THEN
+    const casm = app.synth(); // before #15155 was fixed this threw an error
+
+    const producerTemplate = casm.getStackArtifact(producerStack.artifactId).template;
+    const consumerTemplate = casm.getStackArtifact(consumerStack.artifactId).template;
+
+    // check that the consuming resource references the expected export name
+    const outputName = 'ExportsOutputFnGetAttNested1NestedStackNested1NestedStackResourceCD0AD36BOutputsProducerNested1Nested2NestedStackNested2NestedStackResource1E6FA3C3OutputsProducerNested1Nested238A89CC5Ref2E9E52EA';
+    const exportName = producerTemplate.Outputs[outputName].Export.Name;
+    const importName = consumerTemplate.Resources.ConsumingResource.Properties.RefToResource['Fn::ImportValue'];
+    test.equal(exportName, importName);
+
     test.done();
   },
 
@@ -802,7 +840,7 @@ export = {
     const nested = new NestedStack(parent, 'nested-stack');
 
     // WHEN
-    const location = nested.addDockerImageAsset({
+    const location = nested.synthesizer.addDockerImageAsset({
       directoryName: 'my-image',
       dockerBuildArgs: { key: 'value', boom: 'bam' },
       dockerBuildTarget: 'buildTarget',

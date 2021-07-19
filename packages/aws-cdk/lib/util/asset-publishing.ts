@@ -39,6 +39,10 @@ class PublishingAws implements cdk_assets.IAws {
     private readonly targetEnv: cxapi.Environment) {
   }
 
+  public async discoverPartition(): Promise<string> {
+    return (await this.aws.baseCredentialsPartition(this.targetEnv, Mode.ForWriting)) ?? 'aws';
+  }
+
   public async discoverDefaultRegion(): Promise<string> {
     return this.targetEnv.region;
   }
@@ -53,6 +57,10 @@ class PublishingAws implements cdk_assets.IAws {
 
   public async ecrClient(options: cdk_assets.ClientOptions): Promise<AWS.ECR> {
     return (await this.sdk(options)).ecr();
+  }
+
+  public async secretsManagerClient(options: cdk_assets.ClientOptions): Promise<AWS.SecretsManager> {
+    return (await this.sdk(options)).secretsManager();
   }
 
   /**
